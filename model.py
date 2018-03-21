@@ -3,6 +3,8 @@ import pandas as pd
 from sklearn.ensemble import GradientBoostingClassifier
 # from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import Imputer
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
 
 
 def substrings_in_string(big_string, substrings):
@@ -62,8 +64,8 @@ def add_title(data):
 
 def add_artificial_features(data):
     # add_agemclass(data)
-    # add_family_size(data)
     # add_fare_per_person(data)
+    add_family_size(data)
     add_title(data)
 
 
@@ -71,17 +73,35 @@ if __name__ == "__main__":
     train_data_filename = "train.csv"
     test_data_filename = "test.csv"
 
-    predictors = ['Pclass', 'Sex', 'Age', 'SibSp',
-                  'Parch', 'Fare', 'Embarked',
-                  'Title']
 
-    mlp = GradientBoostingClassifier()
+    predictors = ["Pclass", "Sex", "Age", "SibSp", "Parch",
+              "Fare", "Embarked", "Family_Size", "Title"]
 
+    #mlp = GradientBoostingClassifier()
+    
     train_data = pd.read_csv(train_data_filename)
     test_data = pd.read_csv(test_data_filename)
 
     add_artificial_features(train_data)
     add_artificial_features(test_data)
+
+    for df in train_data, test_data:
+        df["Embarked"].fillna("S", inplace=True)
+        for feature in "Age", "Fare":
+            df[feature].fillna(train_data[feature].mean(), inplace=True)
+
+    for df in train_data, test_data:
+        df.drop("Ticket", axis=1, inplace=True)
+
+    for df in train_data, test_data:
+        df["Embarked"] = df["Embarked"].map(dict(zip(("S", "C", "Q"), (0, 1, 2))))
+        df["Sex"] = df["Sex"].map(dict(zip(("female", "male"), (0, 1))))
+
+
+    nominal_features = ["Pclass", "Sex", "Embarked", "Family_Size", "Title"]
+    for df in train_data, test_data:
+        for nominal in nominal_features:
+            df[nominal] = df[nominal].astype(dtype="category")
 
     train_X = apply_ohe(train_data[predictors])
     train_y = train_data.Survived
@@ -90,13 +110,26 @@ if __name__ == "__main__":
 
     # imputed inputs
     # NaN are replaced with 'real' values created by sklearn
-    my_imputer = Imputer()
-    train_X = my_imputer.fit_transform(train_X)
-    test_X = my_imputer.transform(test_X)
+    #my_imputer = Imputer()
+    #train_X = my_imputer.fit_transform(train_X)
+    #test_X = my_imputer.transform(test_X)
 
-    mlp.fit(train_X, train_y)
+    #mlp.fit(train_X, train_y)
 
-    y = mlp.predict(test_X)
+    #y = mlp.predict(test_X)
+
+
+    forest = RandomForestClassifier(n_estimators=100,
+                                criterion='gini',
+                                max_depth= 5,
+                                min_samples_split=10,
+                                min_samples_leaf=5,
+                                random_state=0)
+
+    forest.fit(train_X, train_y)
+    y = forest.predict(test_X)
+
+    #print("Random Forest score: {0:.2}".format(forest.score(train_X, train_y)))
 
     output_data = {
         'PassengerId': test_data.PassengerId,
